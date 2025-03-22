@@ -18,11 +18,38 @@ const TabLayout = () => {
         }} 
       />
       <Tabs.Screen 
-        name="tab2" 
+        name="skills" 
         options={{
-          title: "Tab 2",
+          title: "Skills",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
+        <Ionicons name="star" size={size} color={color} />
+          ),
+        }} 
+      />
+      <Tabs.Screen 
+        name="market" 
+        options={{
+          title: "Market",
+          tabBarIcon: ({ color, size }) => (
+        <Ionicons name="cart" size={size} color={color} />
+          ),
+        }} 
+      />
+      <Tabs.Screen 
+        name="emergency" 
+        options={{
+          title: "Emergency",
+          tabBarIcon: ({ color, size }) => (
+        <Ionicons name="warning" size={size} color={color} />
+          ),
+        }} 
+      />
+      <Tabs.Screen 
+        name="community" 
+        options={{
+          title: "Community",
+          tabBarIcon: ({ color, size }) => (
+        <Ionicons name="people" size={size} color={color} />
           ),
         }} 
       />
