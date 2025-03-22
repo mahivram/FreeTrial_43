@@ -7,16 +7,24 @@ const ScreenLayout = () => {
     screenOptions={{ headerShown: true }}>
     
     <Stack.Screen
-      name="page2"
-      options={{ title: "Page 2", headerTitleAlign: "center" }}
+      name="jobs"
+      options={{ title: "Jobs", headerTitleAlign: "center" }}
     />
     <Stack.Screen
-      name="page3"
-      options={{ title: "Page 2", headerTitleAlign: "center" }}
+      name="financialeducation"
+      options={{ title: "financialeducation", headerTitleAlign: "center" }}
     />
     <Stack.Screen
-      name="page4"
-      options={{ title: "Page 2", headerTitleAlign: "center" }}
+      name="selfcare"
+      options={{ title: "Selfcare", headerTitleAlign: "center" }}
+    />
+    <Stack.Screen
+      name="financialtool"
+      options={{ title: "FinancialTool", headerTitleAlign: "center" }}
+    />
+    <Stack.Screen
+      name="governmentschemes"
+      options={{ title: "governmentschemes", headerTitleAlign: "center" }}
     />
   </Stack>
 
