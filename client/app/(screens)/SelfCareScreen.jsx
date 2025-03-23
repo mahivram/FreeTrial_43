@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,164 +11,706 @@ import {
   FlatList,
   Linking,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, semantic } from '../theme/colors';
 import { useRouter } from 'expo-router';
+import { generateResponse } from '../services/gemini';
 
 const { width } = Dimensions.get('window');
+
+const topicGuides = {
+  'Mental Wellness': [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Understanding Mental Health",
+          content: "• Practice daily mindfulness and meditation - Set aside 10-15 minutes each morning for quiet reflection and breathing exercises\n• Maintain a regular sleep schedule - Go to bed and wake up at the same time daily, aiming for 7-9 hours of quality sleep\n• Set realistic goals and expectations - Break large tasks into smaller, manageable steps and celebrate small victories\n• Connect with supportive friends and family - Schedule regular check-ins and share your feelings with trusted individuals\n• Take breaks when feeling overwhelmed - Step away from stressful situations for 5-10 minutes to reset and recharge"
+        },
+        {
+          id: "2",
+          title: "Stress Management",
+          content: "• Practice deep breathing exercises - Use the 4-7-8 technique: inhale for 4 seconds, hold for 7, exhale for 8\n• Exercise regularly for mental clarity - Engage in 30 minutes of moderate activity daily, like walking, yoga, or swimming\n• Keep a gratitude journal - Write down 3 things you're thankful for each day to maintain perspective\n• Set boundaries in work and relationships - Learn to say 'no' when needed and communicate your limits clearly\n• Take time for hobbies you enjoy - Dedicate at least 2 hours weekly to activities that bring you joy and relaxation"
+        },
+        {
+          id: "3",
+          title: "Daily Mental Care",
+          content: "• Start your day with positive affirmations - Create and repeat 3-5 personal empowering statements each morning\n• Take short breaks every 2 hours - Step away from work for 5-10 minutes to stretch and reset your mind\n• Practice mindful eating - Focus on your food without distractions, chew slowly, and savor each bite\n• Limit social media exposure - Set specific times for social media use and keep it under 1 hour daily\n• End your day with reflection - Spend 10 minutes before bed reviewing your day and planning tomorrow"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Self Defence Essentials",
+          content: "• Master basic stance and movement - Practice proper foot positioning and quick directional changes daily\n• Learn effective striking techniques - Focus on palm strikes, elbow strikes, and knee strikes for self-defense\n• Develop situational awareness - Regularly scan your environment and identify potential exits\n• Practice verbal de-escalation - Learn phrases and tone of voice to defuse tense situations\n• Build physical conditioning - Include cardio and strength training 3 times weekly for readiness"
+        },
+        {
+          id: "2",
+          title: "Safety Strategies",
+          content: "• Create a personal safety plan - Map out safe routes, identify safe zones, and keep emergency contacts ready\n• Learn to use defensive tools - Familiarize yourself with legal self-defense tools and their proper usage\n• Practice escape techniques - Master basic releases from common grabs and holds\n• Strengthen situational awareness - Regularly assess your surroundings and trust your instincts\n• Build a support network - Connect with local self-defense groups and share safety resources"
+        },
+        {
+          id: "3",
+          title: "Emergency Preparedness",
+          content: "• Prepare emergency contacts - Create a list of important numbers and keep them easily accessible\n• Learn first aid basics - Take a certified first aid course and maintain a well-stocked first aid kit\n• Create evacuation plans - Map multiple escape routes from home, work, and frequently visited places\n• Practice emergency scenarios - Regularly run through different emergency situations mentally\n• Stay informed about local safety - Keep updated on neighborhood safety issues and alerts"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Mental Health Practices",
+          content: "• Create a daily mental health checklist\n• Practice positive visualization\n• Develop healthy coping mechanisms\n• Maintain a mood tracker\n• Build emotional intelligence skills"
+        },
+        {
+          id: "2",
+          title: "Professional Support",
+          content: "• Know when to seek professional help\n• Find the right mental health provider\n• Understand different therapy types\n• Learn about support groups\n• Explore counseling options"
+        },
+        {
+          id: "3",
+          title: "Crisis Management",
+          content: "• Recognize early warning signs\n• Create an emergency support plan\n• Know crisis hotline numbers\n• Practice grounding techniques\n• Identify trusted support people"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Social Connections",
+          content: "• Build meaningful relationships\n• Join support communities\n• Practice active listening\n• Share feelings with trusted friends\n• Participate in group activities"
+        },
+        {
+          id: "2",
+          title: "Work-Life Balance",
+          content: "• Set healthy workplace boundaries\n• Take regular mental health days\n• Practice stress management at work\n• Create a supportive work environment\n• Balance career and personal life"
+        },
+        {
+          id: "3",
+          title: "Personal Growth",
+          content: "• Set personal development goals\n• Learn new skills regularly\n• Practice self-reflection\n• Celebrate small victories\n• Develop new hobbies"
+        }
+      ]
+    }
+  ],
+  'Self Defence': [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Basic Self-Defense",
+          content: "• Stay aware of your surroundings\n• Trust your instincts\n• Keep emergency contacts handy\n• Learn basic striking techniques\n• Practice escape routes"
+        },
+        {
+          id: "2",
+          title: "Safety Strategies",
+          content: "• Use well-lit routes at night\n• Keep your phone charged\n• Share location with trusted contacts\n• Learn to project confidence\n• Know emergency exits"
+        },
+        {
+          id: "3",
+          title: "Daily Safety Habits",
+          content: "• Check your car before entering\n• Vary your routine\n• Keep emergency numbers on speed dial\n• Stay alert in public places\n• Learn basic defensive stance"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Personal Safety",
+          content: "• Master basic self-defense moves\n• Create a safety plan\n• Learn to use defensive tools\n• Practice situational awareness\n• Know your legal rights"
+        },
+        {
+          id: "2",
+          title: "Emergency Response",
+          content: "• Learn to identify threats\n• Practice quick response techniques\n• Know safe zones in your area\n• Use verbal de-escalation\n• Master escape techniques"
+        },
+        {
+          id: "3",
+          title: "Prevention Strategies",
+          content: "• Secure your living space\n• Plan safe travel routes\n• Build a support network\n• Learn to set boundaries\n• Stay informed about local safety"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Advanced Safety",
+          content: "• Learn advanced defense techniques\n• Master pressure point defense\n• Understand legal self-defense rights\n• Practice weapon awareness\n• Develop quick reflexes"
+        },
+        {
+          id: "2",
+          title: "Group Safety",
+          content: "• Organize neighborhood watch\n• Create family safety plans\n• Coordinate with local authorities\n• Build community safety networks\n• Share safety resources"
+        },
+        {
+          id: "3",
+          title: "Digital Safety",
+          content: "• Protect online privacy\n• Secure digital devices\n• Recognize cyber threats\n• Use safety apps effectively\n• Monitor digital footprint"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Environmental Awareness",
+          content: "• Assess location security\n• Identify safe zones\n• Map emergency routes\n• Recognize potential threats\n• Plan escape strategies"
+        },
+        {
+          id: "2",
+          title: "Physical Preparedness",
+          content: "• Build strength and stamina\n• Practice quick movements\n• Learn defensive stances\n• Master escape techniques\n• Improve reaction time"
+        },
+        {
+          id: "3",
+          title: "Mental Preparedness",
+          content: "• Develop situational awareness\n• Stay calm under pressure\n• Make quick decisions\n• Trust your instincts\n• Maintain mental focus"
+        }
+      ]
+    }
+  ],
+  "Women's Health Guide": [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Reproductive Health",
+          content: "• Track menstrual cycle details - Use an app to monitor dates, symptoms, and patterns monthly\n• Practice breast self-examination - Perform checks on the same day each month, noting any changes\n• Maintain regular gynecological visits - Schedule annual check-ups and screenings as recommended\n• Monitor hormonal health - Keep a diary of mood changes, energy levels, and physical symptoms\n• Understand fertility signs - Learn to recognize ovulation indicators and cycle variations"
+        },
+        {
+          id: "2",
+          title: "Nutrition & Wellness",
+          content: "• Ensure adequate iron intake - Include iron-rich foods like leafy greens, lean meats, and legumes daily\n• Maintain bone health - Get 1000-1200mg calcium daily through diet and supplements if needed\n• Balance hormones naturally - Include foods rich in omega-3s, fiber, and antioxidants in your diet\n• Stay properly hydrated - Drink 8-10 glasses of water daily, more during exercise or hot weather\n• Support immune health - Include vitamin C, D, and zinc-rich foods in your daily diet"
+        },
+        {
+          id: "3",
+          title: "Preventive Care",
+          content: "• Schedule regular health screenings - Follow recommended guidelines for mammograms and pap smears\n• Monitor heart health - Check blood pressure monthly and maintain healthy cholesterol levels\n• Practice stress management - Incorporate daily relaxation techniques and regular exercise\n• Maintain bone density - Engage in weight-bearing exercises 3-4 times weekly\n• Track family health history - Keep detailed records of familial health conditions and risks"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Health Essentials",
+          content: "• Schedule regular health check-ups\n• Track your menstrual cycle\n• Maintain breast health awareness\n• Get adequate calcium and iron\n• Practice proper hygiene"
+        },
+        {
+          id: "2",
+          title: "Wellness Tips",
+          content: "• Exercise regularly\n• Maintain a balanced diet\n• Get adequate sleep\n• Manage stress levels\n• Stay hydrated"
+        },
+        {
+          id: "3",
+          title: "Health Monitoring",
+          content: "• Do monthly self-examinations\n• Monitor emotional health\n• Track vital signs\n• Note unusual symptoms\n• Keep health records"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Health Integration",
+          content: "• Regular check-ups\n• Balanced nutrition\n• Active lifestyle\n• Mental health care\n• Social wellness"
+        },
+        {
+          id: "2",
+          title: "Lifestyle Balance",
+          content: "• Balance work and rest\n• Maintain social connections\n• Practice self-care\n• Healthy eating habits\n• Regular exercise routine"
+        },
+        {
+          id: "3",
+          title: "Age-Specific Care",
+          content: "• Teenage health essentials\n• Adult women's checkups\n• Menopause management\n• Senior women's health\n• Age-appropriate exercise"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Mental & Emotional Health",
+          content: "• Handle hormonal mood changes\n• Practice self-acceptance\n• Build body positivity\n• Manage anxiety and stress\n• Develop emotional resilience"
+        },
+        {
+          id: "2",
+          title: "Nutrition & Supplements",
+          content: "• Essential vitamins for women\n• Iron-rich food sources\n• Calcium requirements\n• Pregnancy nutrition\n• Anti-aging nutrients"
+        },
+        {
+          id: "3",
+          title: "Sexual Health",
+          content: "• Regular health screenings\n• STI prevention\n• Maintain intimate health\n• Understand contraception options\n• Practice safe intimacy"
+        }
+      ]
+    }
+  ],
+  'Physical Wellness': [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Exercise Fundamentals",
+          content: "• Plan structured workouts - Include 20 minutes cardio, 15 minutes strength training, 10 minutes flexibility\n• Master proper form - Focus on alignment, controlled movements, and breathing techniques\n• Progress gradually - Increase intensity by 10% weekly to prevent injury and build endurance\n• Track performance metrics - Monitor heart rate, repetitions, weights, and recovery time\n• Listen to body signals - Learn to differentiate between good pain and potential injury signs"
+        },
+        {
+          id: "2",
+          title: "Nutrition Essentials",
+          content: "• Calculate daily caloric needs - Use your age, weight, height, and activity level\n• Balance macronutrients - Aim for 45-65% carbs, 10-35% protein, and 20-35% healthy fats\n• Time meals properly - Eat within 2 hours of waking and every 3-4 hours after\n• Plan pre/post workout nutrition - Consume carbs before and protein within 30 minutes after exercise\n• Stay hydrated throughout day - Drink half your body weight in ounces of water daily"
+        },
+        {
+          id: "3",
+          title: "Recovery & Rest",
+          content: "• Optimize sleep environment - Keep room temperature 60-67°F, use blackout curtains, minimize noise\n• Practice active recovery - Include light activities like walking or yoga on rest days\n• Use proper recovery tools - Incorporate foam rolling, stretching, and massage techniques\n• Monitor sleep quality - Track sleep cycles, duration, and wake times\n• Implement stress reduction - Practice meditation or deep breathing before bed"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Fitness Goals",
+          content: "• Set realistic targets\n• Track your progress\n• Mix cardio and strength\n• Include flexibility work\n• Plan rest periods"
+        },
+        {
+          id: "2",
+          title: "Healthy Habits",
+          content: "• Morning stretching routine\n• Regular posture checks\n• Take walking breaks\n• Stay active throughout day\n• Practice proper breathing"
+        },
+        {
+          id: "3",
+          title: "Injury Prevention",
+          content: "• Warm up properly\n• Use correct form\n• Progress gradually\n• Listen to your body\n• Regular maintenance exercises"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Strength Training",
+          content: "• Basic weightlifting techniques\n• Bodyweight exercises\n• Proper form guidelines\n• Progressive overload\n• Recovery strategies"
+        },
+        {
+          id: "2",
+          title: "Cardio Fitness",
+          content: "• High-intensity intervals\n• Endurance training\n• Heart rate monitoring\n• Different cardio types\n• Breathing techniques"
+        },
+        {
+          id: "3",
+          title: "Flexibility & Mobility",
+          content: "• Dynamic stretching routines\n• Joint mobility exercises\n• Yoga fundamentals\n• Posture improvement\n• Range of motion work"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Sports Performance",
+          content: "• Sport-specific training\n• Agility development\n• Speed enhancement\n• Balance training\n• Performance nutrition"
+        },
+        {
+          id: "2",
+          title: "Recovery Methods",
+          content: "• Post-workout nutrition\n• Sleep optimization\n• Massage techniques\n• Active recovery\n• Stress management"
+        },
+        {
+          id: "3",
+          title: "Lifestyle Integration",
+          content: "• Daily movement habits\n• Active commuting\n• Desk exercise breaks\n• Weekend activities\n• Family fitness time"
+        }
+      ]
+    }
+  ],
+  'Meditation Guide': [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Getting Started with Meditation",
+          content: "• Create a dedicated meditation space - Set up a quiet corner with cushions, dim lighting, and minimal distractions\n• Establish a regular practice time - Start with 5-10 minutes at the same time each day, preferably early morning\n• Master basic breathing techniques - Practice 4-count breathing: inhale for 4, hold for 4, exhale for 4\n• Use guided meditation apps - Begin with beginner-friendly apps like Headspace or Calm for structured practice\n• Build consistency gradually - Increase duration by 1-2 minutes each week as you become comfortable"
+        },
+        {
+          id: "2",
+          title: "Advanced Meditation Techniques",
+          content: "• Practice body scan meditation - Spend 15-20 minutes systematically relaxing each body part from toes to head\n• Explore mindful walking - Walk slowly for 10-15 minutes, focusing on each step and breath\n• Try loving-kindness meditation - Direct positive thoughts to yourself and others for 10 minutes daily\n• Implement visualization techniques - Create detailed mental images of peaceful scenes or positive outcomes\n• Master mantra meditation - Choose a meaningful phrase and repeat it silently for 10-15 minutes"
+        },
+        {
+          id: "3",
+          title: "Integration & Benefits",
+          content: "• Practice mindful eating - Take 20 minutes for meals, focusing on flavors, textures, and gratitude\n• Incorporate mini-meditations - Take 2-minute breathing breaks during busy workdays\n• Use meditation for stress relief - Practice 5-minute calming techniques during challenging situations\n• Track meditation progress - Keep a journal of practice times, experiences, and insights\n• Join meditation communities - Connect with local groups or online forums for support and guidance"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Advanced Methods",
+          content: "• Visualization techniques\n• Mantra meditation\n• Sound meditation\n• Movement meditation\n• Chakra meditation"
+        },
+        {
+          id: "2",
+          title: "Stress Relief",
+          content: "• Quick calming techniques\n• Anxiety reduction\n• Emotional balance\n• Mental clarity\n• Energy restoration"
+        },
+        {
+          id: "3",
+          title: "Mindful Living",
+          content: "• Present moment awareness\n• Mindful eating\n• Conscious communication\n• Emotional awareness\n• Stress management"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Specialized Techniques",
+          content: "• Transcendental meditation\n• Zen meditation practice\n• Kundalini meditation\n• Guided visualization\n• Chakra meditation"
+        },
+        {
+          id: "2",
+          title: "Group Meditation",
+          content: "• Finding meditation groups\n• Group energy benefits\n• Shared practice tips\n• Community support\n• Leading meditation sessions"
+        },
+        {
+          id: "3",
+          title: "Meditation for Goals",
+          content: "• Focus enhancement\n• Creativity boost\n• Problem-solving meditation\n• Manifestation practice\n• Goal visualization"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Digital Meditation",
+          content: "• Using meditation apps\n• Online guided sessions\n• Virtual meditation rooms\n• Timer and tracking tools\n• Digital community support"
+        },
+        {
+          id: "2",
+          title: "Environmental Setup",
+          content: "• Create meditation space\n• Choose proper lighting\n• Use aromatherapy\n• Select meditation music\n• Maintain sacred space"
+        },
+        {
+          id: "3",
+          title: "Integration Practices",
+          content: "• Walking meditation\n• Eating meditation\n• Work meditation\n• Travel meditation\n• Nature meditation"
+        }
+      ]
+    }
+  ],
+  'Lifestyle Balance': [
+    {
+      version: 1,
+      topics: [
+        {
+          id: "1",
+          title: "Time Management Excellence",
+          content: "• Implement time blocking - Schedule your day in 30-minute blocks, including breaks and buffer time\n• Use the 2-minute rule - Complete tasks immediately if they take less than 2 minutes\n• Practice priority setting - Use the Eisenhower Matrix to categorize tasks by urgency and importance\n• Create morning/evening routines - Develop 30-minute routines to bookend your day effectively\n• Master the art of delegation - Identify tasks that can be delegated and train others appropriately"
+        },
+        {
+          id: "2",
+          title: "Work-Life Harmony",
+          content: "• Set clear work boundaries - Establish specific work hours and stick to them consistently\n• Create dedicated family time - Schedule at least 2 hours of uninterrupted family time daily\n• Plan regular breaks - Take 15-minute breaks every 90 minutes during work\n• Practice digital detox - Implement tech-free periods, especially during meals and before bed\n• Maintain social connections - Schedule regular catch-ups with friends and loved ones"
+        },
+        {
+          id: "3",
+          title: "Personal Development",
+          content: "• Set SMART goals - Create Specific, Measurable, Achievable, Relevant, and Time-bound objectives\n• Develop new skills quarterly - Dedicate 3-4 hours weekly to learning something new\n• Read regularly - Spend 30 minutes daily reading personal development books\n• Practice reflection - Journal for 10 minutes daily about progress and learnings\n• Build professional networks - Attend monthly networking events or online webinars"
+        }
+      ]
+    },
+    {
+      version: 2,
+      topics: [
+        {
+          id: "1",
+          title: "Daily Structure",
+          content: "• Morning routine\n• Regular meal times\n• Exercise schedule\n• Evening wind-down\n• Weekly planning"
+        },
+        {
+          id: "2",
+          title: "Health Integration",
+          content: "• Regular check-ups\n• Balanced nutrition\n• Active lifestyle\n• Mental health care\n• Social wellness"
+        },
+        {
+          id: "3",
+          title: "Life Organization",
+          content: "• Goal setting\n• Progress tracking\n• Regular reviews\n• Adjustment strategies\n• Success celebration"
+        }
+      ]
+    },
+    {
+      version: 3,
+      topics: [
+        {
+          id: "1",
+          title: "Financial Wellness",
+          content: "• Create budget plans\n• Set financial goals\n• Build emergency savings\n• Track expenses\n• Plan investments"
+        },
+        {
+          id: "2",
+          title: "Social Connection",
+          content: "• Nurture relationships\n• Plan social activities\n• Join community groups\n• Network professionally\n• Balance social media"
+        },
+        {
+          id: "3",
+          title: "Personal Development",
+          content: "• Set learning goals\n• Read regularly\n• Take online courses\n• Develop new skills\n• Track progress"
+        }
+      ]
+    },
+    {
+      version: 4,
+      topics: [
+        {
+          id: "1",
+          title: "Home Organization",
+          content: "• Declutter regularly\n• Create cleaning schedules\n• Organize living spaces\n• Maintain home systems\n• Practice minimalism"
+        },
+        {
+          id: "2",
+          title: "Digital Balance",
+          content: "• Set screen time limits\n• Practice digital detox\n• Organize digital files\n• Manage notifications\n• Create online boundaries"
+        },
+        {
+          id: "3",
+          title: "Creative Expression",
+          content: "• Start artistic hobbies\n• Write or journal\n• Practice music\n• Try DIY projects\n• Express creativity daily"
+        }
+      ]
+    }
+  ]
+};
 
 const SelfCareScreen = () => {
   const [expandedTopic, setExpandedTopic] = useState(null);
   const [expandedSubtopic, setExpandedSubtopic] = useState(null);
+  const [healthTopics, setHealthTopics] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [topicLoadingStates, setTopicLoadingStates] = useState({});
   const router = useRouter();
 
-  const healthTopics = [
+  useEffect(() => {
+    loadTopicContent();
+  }, []);
+
+  const createTopicPrompt = (topic) => {
+    return `Create a guide about ${topic} with 3 sections. Format the response EXACTLY as follows, with bullet points for content:
+
+{
+  "topics": [
     {
-      id: '1',
-      title: 'Mental Wellness',
-      description: 'Comprehensive mental health support and resources',
-      icon: 'brain',
-      color: '#60A5FA',
-      topics: [
-        {
-          id: '1-1',
-          title: 'Stress & Anxiety Management',
-          content: 'Comprehensive techniques for managing stress and anxiety:\n\nDaily Management:\n• Deep breathing exercises\n• Progressive muscle relaxation\n• Mindfulness meditation\n• Grounding techniques\n• Time management skills\n• Setting healthy boundaries\n\nAnxiety-Specific Techniques:\n• 5-4-3-2-1 sensory exercise\n• Thought challenging worksheets\n• Worry time scheduling\n• Exposure therapy principles\n• Panic attack management\n\nLifestyle Changes:\n• Regular exercise routine\n• Sleep hygiene\n• Nutrition for mental health\n• Social support building\n• Work-life balance\n\nProfessional Support:\n• When to seek help\n• Types of therapy available\n• Finding a mental health professional\n• Crisis resources and hotlines',
-        },
-        {
-          id: '1-2',
-          title: 'Depression Support',
-          content: 'Understanding and managing depression:\n\nRecognizing Symptoms:\n• Emotional changes\n• Physical symptoms\n• Behavioral changes\n• Cognitive symptoms\n• Warning signs\n\nSelf-Help Strategies:\n• Daily routine establishment\n• Activity scheduling\n• Pleasant activity planning\n• Social connection maintenance\n• Goal setting techniques\n\nTreatment Options:\n• Different therapy types\n• Medication information\n• Alternative treatments\n• Lifestyle modifications\n• Support group benefits\n\nCrisis Management:\n• Safety planning\n• Emergency contacts\n• Crisis hotlines\n• Support resources\n• When to seek immediate help',
-        },
-        {
-          id: '1-3',
-          title: 'Emotional Intelligence',
-          content: 'Building emotional awareness and resilience:\n\nSelf-Awareness:\n• Emotion identification\n• Trigger recognition\n• Personal pattern awareness\n• Values clarification\n• Strength assessment\n\nEmotional Regulation:\n• Coping strategies\n• Mood management\n• Anger management\n• Stress reduction\n• Emotional expression\n\nSocial Skills:\n• Active listening\n• Assertive communication\n• Conflict resolution\n• Empathy building\n• Relationship boundaries\n\nPersonal Growth:\n• Goal setting\n• Resilience building\n• Self-compassion\n• Mindset development\n• Continuous learning',
-        }
-      ]
+      "id": "1",
+      "title": "Key Information",
+      "content": "• First key point about ${topic}\n• Second important point\n• Third essential point"
     },
     {
-      id: '2',
-      title: 'Self Defence',
-      description: 'Essential safety techniques and emergency preparedness',
-      icon: 'shield-account',
-      color: '#DC2626',
-      topics: [
-        {
-          id: '2-1',
-          title: 'Personal Safety',
-          content: 'Essential safety awareness tips:\n\nStaying Alert:\n• Be aware of surroundings\n• Trust your instincts\n• Avoid distractions while walking\n• Stay in well-lit areas\n• Walk confidently\n\nSafe Travel:\n• Plan your route in advance\n• Share location with trusted contacts\n• Use verified transportation\n• Keep emergency contacts handy\n• Avoid isolated areas\n\nHome Safety:\n• Secure doors and windows\n• Install proper lighting\n• Know your neighbors\n• Have emergency plans\n• Regular security checks',
-        },
-        {
-          id: '2-2',
-          title: 'Basic Self-Defence Moves',
-          content: 'Fundamental self-defense techniques:\n\nStance & Position:\n• Proper defensive stance\n• Creating distance\n• Quick escape moves\n• Safe falling techniques\n• Body positioning\n\nBasic Moves:\n• Palm strike\n• Knee strike\n• Elbow defense\n• Wrist grab escape\n• Basic blocks\n\nEmergency Response:\n• Voice commands\n• Quick reaction drills\n• Breaking free techniques\n• Running safely\n• Calling for help',
-        },
-        {
-          id: '2-3',
-          title: 'Emergency Preparedness',
-          content: 'Emergency readiness guide:\n\nEmergency Contacts:\n• Police: 100\n• Women\'s Helpline: 1091\n• Ambulance: 102\n• Local police station\n• Trusted contacts\n\nSafety Tools:\n• Personal alarm devices\n• Emergency apps\n• Whistle\n• Flashlight\n• First aid kit\n\nEmergency Plans:\n• Safe meeting points\n• Escape routes\n• Code words with family\n• Local safe zones\n• Community resources',
-        }
-      ]
+      "id": "2",
+      "title": "Practical Tips",
+      "content": "• First practical tip\n• Second useful tip\n• Third helpful tip"
     },
     {
-      id: '3',
-      title: 'Women\'s Health Guide',
-      description: 'Essential information about women\'s health and wellness',
-      icon: 'human-female',
-      color: '#EC4899',
-      topics: [
-        {
-          id: '2-1',
-          title: 'Pregnancy Guide',
-          content: 'Comprehensive pregnancy care information:\n\nFirst Trimester Care:\n• Prenatal vitamins and nutrition\n• Common symptoms management\n• Exercise guidelines\n• Foods to avoid\n• Medical check-ups schedule\n\nSecond Trimester:\n• Physical changes\n• Exercise modifications\n• Sleep positioning\n• Travel guidelines\n• Pregnancy tests and screenings\n\nThird Trimester:\n• Birth preparation\n• Labor signs\n• Hospital bag checklist\n• Birth plan creation\n• Pain management options\n\nPostpartum Care:\n• Physical recovery\n• Emotional wellbeing\n• Breastfeeding support\n• Newborn care\n• Self-care strategies\n\nPregnancy Complications:\n• Warning signs\n• Emergency symptoms\n• When to call doctor\n• Gestational diabetes\n• Preeclampsia awareness',
-        },
-        {
-          id: '2-2',
-          title: 'Menstrual Health',
-          content: 'Comprehensive menstrual health guide:\n\nCycle Understanding:\n• Menstrual cycle phases\n• Hormonal changes\n• Tracking methods\n• Normal vs. abnormal\n• Fertility awareness\n\nMenstrual Care:\n• Product options\n• Hygiene practices\n• Sustainable alternatives\n• Pain management\n• Exercise considerations\n\nCommon Conditions:\n• PCOS symptoms and management\n• Endometriosis awareness\n• Fibroids\n• Heavy periods\n• Irregular cycles\n\nLifestyle Management:\n• Diet recommendations\n• Exercise adaptations\n• Stress management\n• Sleep optimization\n• Supplement guidance\n\nWhen to Seek Help:\n• Abnormal symptoms\n• Medical conditions\n• Treatment options\n• Finding specialists\n• Support resources',
-        },
-        {
-          id: '2-3',
-          title: 'Reproductive Health',
-          content: 'Comprehensive reproductive health information:\n\nPreventive Care:\n• Regular check-ups\n• Cancer screenings\n• Vaccination schedule\n• STI prevention\n• Sexual health\n\nFamily Planning:\n• Contraception options\n• Natural family planning\n• Fertility awareness\n• Preconception health\n• Genetic counseling\n\nGynecological Health:\n• Common conditions\n• Treatment options\n• Self-examination\n• Warning signs\n• Preventive measures\n\nMenopause:\n• Understanding stages\n• Symptom management\n• Treatment options\n• Lifestyle adjustments\n• Support resources',
-        }
-      ]
-    },
-    {
-      id: '4',
-      title: 'Physical Wellness',
-      description: 'Holistic approach to physical health and fitness',
-      icon: 'heart-pulse',
-      color: '#059669',
-      topics: [
-        {
-          id: '3-1',
-          title: 'Exercise Guide',
-          content: 'Comprehensive fitness program:\n\nCardiovascular Health:\n• Types of cardio\n• Heart rate zones\n• Training progression\n• Safety guidelines\n• Equipment options\n\nStrength Training:\n• Basic exercises\n• Proper form\n• Progressive overload\n• Recovery tips\n• Equipment guide\n\nFlexibility & Mobility:\n• Stretching routines\n• Yoga basics\n• Joint mobility\n• Injury prevention\n• Recovery techniques\n\nWorkout Planning:\n• Program design\n• Schedule creation\n• Goal setting\n• Progress tracking\n• Adaptation strategies',
-        },
-        {
-          id: '3-2',
-          title: 'Nutrition Guide',
-          content: 'Comprehensive nutrition information:\n\nBasic Nutrition:\n• Macronutrients\n• Micronutrients\n• Portion control\n• Meal timing\n• Hydration needs\n\nMeal Planning:\n• Balanced meals\n• Grocery shopping\n• Meal prep tips\n• Healthy recipes\n• Snack options\n\nSpecial Diets:\n• Vegetarian/Vegan\n• Gluten-free\n• Low-carb\n• Mediterranean\n• DASH diet\n\nNutrition Goals:\n• Weight management\n• Muscle building\n• Energy optimization\n• Sports nutrition\n• Recovery nutrition',
-        },
-        {
-          id: '3-3',
-          title: 'Sleep Optimization',
-          content: 'Comprehensive sleep guide:\n\nSleep Basics:\n• Sleep cycles\n• Optimal duration\n• Quality indicators\n• Common issues\n• Impact on health\n\nSleep Hygiene:\n• Bedroom environment\n• Evening routine\n• Morning routine\n• Technology usage\n• Light exposure\n\nSleep Solutions:\n• Natural remedies\n• Relaxation techniques\n• Sleep positions\n• Travel adjustments\n• Shift work strategies\n\nTroubleshooting:\n• Insomnia management\n• Sleep tracking\n• When to seek help\n• Treatment options\n• Professional resources',
-        }
-      ]
-    },
-    {
-      id: '5',
-      title: 'Meditation Guide',
-      description: 'Comprehensive meditation practices for mind and body',
-      icon: 'meditation',
-      color: '#8B5CF6',
-      topics: [
-        {
-          id: '4-1',
-          title: 'Meditation Basics',
-          content: 'Foundation of meditation practice:\n\nGetting Started:\n• Proper posture guide\n• Breathing techniques\n• Setting up meditation space\n• Best times to meditate\n• Duration guidelines\n\nTypes of Meditation:\n• Mindfulness meditation\n• Focused meditation\n• Movement meditation\n• Loving-kindness meditation\n• Transcendental meditation\n\nCommon Challenges:\n• Dealing with distractions\n• Managing restlessness\n• Overcoming sleepiness\n• Maintaining consistency\n• Building regular practice\n\nMeditation Tools:\n• Meditation apps\n• Timer options\n• Guided recordings\n• Music and sounds\n• Meditation cushions',
-        },
-        {
-          id: '4-2',
-          title: 'Meditation Techniques',
-          content: 'Detailed meditation practices:\n\nBreathing Meditation:\n• Box breathing\n• 4-7-8 technique\n• Alternate nostril breathing\n• Breath awareness\n• Ocean breath\n\nBody-Based Meditation:\n• Body scan meditation\n• Progressive relaxation\n• Walking meditation\n• Eating meditation\n• Hand meditation\n\nVisualization Practices:\n• Nature visualization\n• Light visualization\n• Chakra meditation\n• Safe place meditation\n• Goal visualization\n\nSound Meditation:\n• Mantra meditation\n• Sound bath practice\n• Binaural beats\n• Nature sounds\n• Silence meditation',
-        },
-        {
-          id: '4-3',
-          title: 'Advanced Practices',
-          content: 'Deeper meditation practices:\n\nMindfulness Techniques:\n• Open awareness\n• Choiceless awareness\n• Insight meditation\n• Contemplative inquiry\n• Self-observation\n\nSpiritual Practices:\n• Heart-centered meditation\n• Energy meditation\n• Higher self connection\n• Gratitude meditation\n• Forgiveness practice\n\nIntegration Methods:\n• Daily life mindfulness\n• Mindful communication\n• Emotional awareness\n• Thought observation\n• Present moment living\n\nMeditation Retreats:\n• Types of retreats\n• Preparation guide\n• What to expect\n• Integration after\n• Finding retreats',
-        }
-      ]
-    },
-    {
-      id: '6',
-      title: 'Lifestyle Balance',
-      description: 'Creating harmony in daily life',
-      icon: 'balance-scale',
-      color: '#D97706',
-      topics: [
-        {
-          id: '5-1',
-          title: 'Time Management',
-          content: 'Effective time management strategies:\n\nPlanning Techniques:\n• Priority setting\n• Goal breakdown\n• Time blocking\n• Task batching\n• Schedule optimization\n\nProductivity Tools:\n• Digital calendars\n• Task managers\n• Time tracking\n• Focus techniques\n• Automation tips\n\nWork-Life Balance:\n• Boundary setting\n• Energy management\n• Stress reduction\n• Leisure planning\n• Family time',
-        },
-        {
-          id: '5-2',
-          title: 'Self-Care Rituals',
-          content: 'Building meaningful self-care practices:\n\nDaily Rituals:\n• Morning routine\n• Evening wind-down\n• Mindful breaks\n• Digital detox\n• Nature connection\n\nSelf-Care Activities:\n• Meditation\n• Journaling\n• Creative expression\n• Movement practices\n• Relaxation techniques\n\nEnvironmental Care:\n• Home organization\n• Workspace setup\n• Nature exposure\n• Decluttering\n• Sacred space creation',
-        },
-        {
-          id: '5-3',
-          title: 'Social Wellness',
-          content: 'Building and maintaining relationships:\n\nSocial Connections:\n• Friend relationships\n• Family bonds\n• Professional networks\n• Community involvement\n• Support systems\n\nCommunication Skills:\n• Active listening\n• Conflict resolution\n• Boundary setting\n• Emotional expression\n• Digital communication\n\nSocial Activities:\n• Group activities\n• Volunteer work\n• Social events\n• Hobby groups\n• Online communities'
-        }
-      ]
+      "id": "3",
+      "title": "Daily Practices",
+      "content": "• First daily practice\n• Second daily practice\n• Third daily practice"
     }
-  ];
+  ]
+}`;
+  };
+
+  const parseGeminiResponse = (response) => {
+    try {
+      // First try direct JSON parse
+      try {
+        const directParse = JSON.parse(response);
+        if (isValidTopicStructure(directParse)) {
+          return directParse;
+        }
+      } catch (e) {
+        // Continue to more aggressive parsing if direct parse fails
+      }
+
+      // Find JSON-like structure
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON structure found');
+      }
+
+      const jsonStr = jsonMatch[0];
+      const parsed = JSON.parse(jsonStr);
+
+      if (!isValidTopicStructure(parsed)) {
+        throw new Error('Invalid topic structure');
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error('Error parsing Gemini response:', error);
+      return createFallbackTopic(error.message);
+    }
+  };
+
+  const isValidTopicStructure = (data) => {
+    return (
+      data &&
+      typeof data === 'object' &&
+      typeof data.title === 'string' &&
+      typeof data.description === 'string' &&
+      typeof data.icon === 'string' &&
+      typeof data.color === 'string' &&
+      Array.isArray(data.topics) &&
+      data.topics.every(topic =>
+        topic &&
+        typeof topic.id === 'string' &&
+        typeof topic.title === 'string' &&
+        typeof topic.content === 'string'
+      )
+    );
+  };
+
+  const createFallbackTopic = (errorMessage) => {
+    return {
+      title: "Topic Information",
+      description: "Temporary content while we load the actual information",
+      icon: "information",
+      color: "#6B7280",
+      topics: [
+        {
+          id: "1",
+          title: "Getting Started",
+          content: "• Basic information about this topic\n• Key concepts to understand\n• Fundamental principles"
+        },
+        {
+          id: "2",
+          title: "Common Practices",
+          content: "• Best practices for beginners\n• Intermediate techniques\n• Advanced strategies"
+        },
+        {
+          id: "3",
+          title: "Additional Resources",
+          content: "• Helpful tips and tricks\n• Recommended reading\n• Practice exercises"
+        }
+      ]
+    };
+  };
+
+  const loadTopicContent = async () => {
+    setIsLoading(true);
+    try {
+      const topics = [
+        {
+          name: 'Mental Wellness',
+          icon: 'brain',
+          color: '#4F46E5',
+          description: 'Understand and improve your mental health'
+        },
+        {
+          name: 'Self Defence',
+          icon: 'shield-account',
+          color: '#DC2626',
+          description: 'Learn essential self-defense techniques'
+        },
+        {
+          name: "Women's Health Guide",
+          icon: 'human-female',
+          color: '#DB2777',
+          description: 'Comprehensive women\'s health information'
+        },
+        {
+          name: 'Physical Wellness',
+          icon: 'heart-pulse',
+          color: '#059669',
+          description: 'Maintain your physical well-being'
+        },
+        {
+          name: 'Meditation Guide',
+          icon: 'meditation',
+          color: '#7C3AED',
+          description: 'Learn meditation and mindfulness'
+        },
+        {
+          name: 'Lifestyle Balance',
+          icon: 'scale-balance',
+          color: '#2563EB',
+          description: 'Achieve work-life balance'
+        }
+      ];
+
+      const initialTopics = topics.map((topic, index) => {
+        const guides = topicGuides[topic.name];
+        const initialGuide = guides[0]; // Start with first version
+
+        return {
+          id: String(index + 1),
+          title: topic.name,
+          description: topic.description,
+          icon: topic.icon,
+          color: topic.color,
+          currentVersion: 0,
+          topics: initialGuide.topics
+        };
+      });
+
+      setHealthTopics(initialTopics);
+    } catch (error) {
+      console.error('Error loading topic content:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshContent = async (topicId) => {
+    const topic = healthTopics.find(t => t.id === topicId);
+    if (!topic) return;
+
+    const guides = topicGuides[topic.title];
+    if (!guides) return;
+
+    // Get next version index (cycle through available versions)
+    const nextVersion = (topic.currentVersion + 1) % guides.length;
+    const nextGuide = guides[nextVersion];
+
+    setHealthTopics(prev => prev.map(t => 
+      t.id === topicId ? {
+        ...t,
+        currentVersion: nextVersion,
+        topics: nextGuide.topics
+      } : t
+    ));
+  };
 
   const toggleTopic = (topicId) => {
     if (expandedTopic === topicId) {
@@ -184,7 +726,16 @@ const SelfCareScreen = () => {
     setExpandedSubtopic(expandedSubtopic === subtopicId ? null : subtopicId);
   };
 
-  const renderSubtopics = (topics) => {
+  const renderSubtopics = (topics, topicId) => {
+    if (topicLoadingStates[topicId]) {
+      return (
+        <View style={styles.loadingTopicContainer}>
+          <ActivityIndicator size="small" color={colors.primary.main} />
+          <Text style={styles.loadingTopicText}>Loading content...</Text>
+        </View>
+      );
+    }
+
     return topics.map((topic) => (
       <View key={topic.id} style={styles.subtopicContainer}>
         <TouchableOpacity 
@@ -199,15 +750,18 @@ const SelfCareScreen = () => {
         </TouchableOpacity>
         {expandedSubtopic === topic.id && (
           <View style={styles.subtopicContent}>
-            <Text style={styles.subtopicText}>{topic.content}</Text>
+            {topic.content.split('\n').map((line, index) => (
+              <Text key={index} style={styles.subtopicText}>
+                {line.trim()}{'\n'}
+              </Text>
+            ))}
           </View>
         )}
       </View>
     ));
   };
 
-  const renderHeader = () => {
-    return (
+  const renderHeader = () => (
       <View style={styles.headerWrapper}>
         <StatusBar
           backgroundColor="#FFFFFF"
@@ -224,33 +778,29 @@ const SelfCareScreen = () => {
             <View style={styles.titleContainer}>
               <Text style={styles.headerTitle}>Self Care</Text>
             </View>
-            <View style={styles.headerPlaceholder} />
-          </View>
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={() => expandedTopic && refreshContent(expandedTopic)}>
+            <Icon name="refresh" size={20} color={colors.primary.main} />
+          </TouchableOpacity>
         </View>
       </View>
-    );
-  };
-
-  const renderResource = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.resourceCard, { borderLeftColor: item.color }]}
-      onPress={() => {
-        if (item.link) {
-          router.push(item.link);
-        } else if (item.phone) {
-          Linking.openURL(`tel:${item.phone}`);
-        }
-      }}>
-      <View style={[styles.resourceIcon, { backgroundColor: `${item.color}15` }]}>
-        <Icon name={item.icon} size={26} color={item.color} />
       </View>
-      <View style={styles.resourceContent}>
-        <Text style={styles.resourceTitle}>{item.title}</Text>
-        <Text style={styles.resourceDescription}>{item.description}</Text>
-      </View>
-      <Icon name="chevron-right" size={22} color={item.color} />
-    </TouchableOpacity>
   );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {renderHeader()}
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary.main} />
+            <Text style={styles.loadingText}>Loading wellness resources...</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -287,7 +837,7 @@ const SelfCareScreen = () => {
                   </View>
                 </TouchableOpacity>
                 
-                {expandedTopic === topic.id && renderSubtopics(topic.topics)}
+                {expandedTopic === topic.id && renderSubtopics(topic.topics, topic.id)}
               </View>
             ))}
           </View>
@@ -467,6 +1017,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: semantic.text.secondary,
+  },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingTopicContainer: {
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingTopicText: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: semantic.text.secondary,
+    fontWeight: '500',
+  },
 });
+
+// Fallback static content in case API fails
+const staticHealthTopics = [
+  // ... your existing healthTopics array as fallback ...
+];
 
 export default SelfCareScreen; 

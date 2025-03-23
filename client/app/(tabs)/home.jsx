@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingRight: 10,
-    paddingLeft: 10,
+    paddingLeft: 15,
     paddingTop: 20,
     justifyContent: 'space-between',
   },

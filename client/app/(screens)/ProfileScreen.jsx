@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,31 @@ import {
   ScrollView,
   Switch,
   Image,
-  Platform
+  Platform,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, semantic } from '../theme/colors';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BASE_URL_Profile = 'https://myapp.loca.lt/api/user';
 
 const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
   const router = useRouter();
   const { signOut } = useAuth();
-  const userProfile = {
-    name: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    avatar: "https://i.pravatar.cc/150?img=48"
-  };
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userProfile, setUserProfile] = useState({
+    name: "",
+    email: "",
+    profilePic: null,
+    mo_parent: "",
+    mo_user: ""
+  });
 
   const settingsOptions = [
     {
@@ -51,6 +61,57 @@ const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
     }
   ];
 
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('authToken');
+      
+      const response = await axios.get(`https://myapp.loca.lt/api/user/`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (response.data) {
+        setUserProfile({
+          name: response.data.name || "",
+          email: response.data.email || "",
+          profilePic: response.data.profilePic || null,
+          mo_parent: response.data.mo_parent || "",
+          mo_user: response.data.mo_user || ""
+        });
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Profile fetch error:', err);
+      setError('Failed to load profile data');
+      Alert.alert('Error', 'Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await AsyncStorage.removeItem('authToken');
+      signOut();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to sign out');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary.main} />
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
@@ -66,11 +127,15 @@ const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
       {/* Profile Info */}
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: userProfile.avatar }}
+          source={
+            userProfile.profilePic
+              ? { uri: userProfile.profilePic }
+              : require('../../assets/default-avatar.png')
+          }
           style={styles.avatar}
         />
         <Text style={styles.name}>{userProfile.name}</Text>
-        <Text style={styles.email}>{userProfile.email}</Text>
+
         <TouchableOpacity 
           style={styles.editButton}
           onPress={() => router.push('/(screens)/editProfile')}>
@@ -119,7 +184,7 @@ const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
       {/* Logout Button */}
       <TouchableOpacity 
         style={styles.logoutButton}
-        onPress={signOut}>
+        onPress={handleSignOut}>
         <Icon name="logout" size={24} color="#DC2626" />
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
@@ -233,6 +298,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF'
+  }
 });
 
 export default ProfileScreen; 

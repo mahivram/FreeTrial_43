@@ -11,11 +11,13 @@ import {
   StatusBar,
   Alert,
   Modal as RNModal,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, shadows, semantic, components } from '../theme/colors';
 import { storeAuthToken, isAuthenticated } from '../services/auth';
 import {io} from 'socket.io-client';
+import * as ImagePicker from 'expo-image-picker';
 import {
   createCommunityPost,
   getCommunityPosts,
@@ -39,7 +41,9 @@ const CommunityScreen = ({ navigation }) => {
     heading_name: '',
     description: '',
     labels: [],
+    communityPic: null
   });
+  const [labelInput, setLabelInput] = useState('');
 
   // Add timeout ref
   const timeoutRef = React.useRef(null);
@@ -67,6 +71,7 @@ const CommunityScreen = ({ navigation }) => {
       heading_name: '',
       description: '',
       labels: [],
+      communityPic: null
     });
   };
 
@@ -142,6 +147,40 @@ const CommunityScreen = ({ navigation }) => {
     }
   };
 
+  const requestMediaLibraryPermission = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to upload images.');
+      }
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        const selectedAsset = result.assets[0];
+        setNewPost(prev => ({
+          ...prev,
+          communityPic: {
+            uri: selectedAsset.uri,
+            type: 'image/jpeg',
+            name: 'community-post-image.jpg'
+          }
+        }));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!newPost.heading_name.trim() || !newPost.description.trim() || !newPost.heading) {
       Alert.alert('Error', 'Please fill in all required fields');
@@ -151,20 +190,31 @@ const CommunityScreen = ({ navigation }) => {
     try {
       setIsLoading(true);
 
-      // Set a timeout to prevent infinite loading
       timeoutRef.current = setTimeout(() => {
         if (isLoading) {
           setIsLoading(false);
-          Alert.alert(
-            'Error',
-            'Request timed out. Please try again.'
-          );
+          Alert.alert('Error', 'Request timed out. Please try again.');
         }
-      }, 15000); // 15 seconds timeout
+      }, 15000);
 
-      const response = await createCommunityPost(newPost);
+      const formData = new FormData();
+      formData.append('heading', newPost.heading);
+      formData.append('heading_name', newPost.heading_name);
+      formData.append('description', newPost.description);
       
-      // Clear timeout as request completed
+      // Send labels as a single array
+      formData.append('labels', newPost.labels);
+
+      if (newPost.communityPic) {
+        formData.append('communityPic', {
+          uri: newPost.communityPic.uri,
+          type: 'image/jpeg',
+          name: 'community-post-image.jpg'
+        });
+      }
+
+      const response = await createCommunityPost(formData);
+      
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -176,14 +226,11 @@ const CommunityScreen = ({ navigation }) => {
 
       setShowNewPostModal(false);
       resetCreatePostState();
-      fetchPosts(); // Refresh posts
+      fetchPosts();
       Alert.alert('Success', 'Post created successfully!');
     } catch (error) {
       console.error('Create post error:', error);
-      Alert.alert(
-        'Error',
-        'Failed to create post. Please check your connection and try again.'
-      );
+      Alert.alert('Error', 'Failed to create post. Please check your connection and try again.');
     } finally {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -232,6 +279,23 @@ const CommunityScreen = ({ navigation }) => {
     );
   };
 
+  const handleAddLabel = () => {
+    if (labelInput.trim()) {
+      setNewPost(prev => ({
+        ...prev,
+        labels: [...prev.labels, labelInput.trim()]
+      }));
+      setLabelInput('');
+    }
+  };
+
+  const handleRemoveLabel = (indexToRemove) => {
+    setNewPost(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
   // Mock data for categories
   const categories = [
     { id: '1', name: 'All', icon: 'view-grid' },
@@ -245,7 +309,7 @@ const CommunityScreen = ({ navigation }) => {
   const renderPost = ({ item }) => (
     <TouchableOpacity 
       style={styles.postCard}
-      onPress={() => navigation.navigate('PostDetail', { post: item })}>
+      >
       <View style={styles.postHeader}>
         <View style={styles.authorInfo}>
           <Image 
@@ -255,7 +319,6 @@ const CommunityScreen = ({ navigation }) => {
           <View>
             <Text style={styles.authorName}>{item.createdBy?.name || 'Anonymous'}</Text>
             <Text style={styles.timeAgo}>
-              
               {new Date(item.createdAt).toLocaleDateString("en-GB")}
             </Text>
           </View>
@@ -275,6 +338,14 @@ const CommunityScreen = ({ navigation }) => {
       <Text style={styles.postContent} numberOfLines={3}>
         {item.description}
       </Text>
+
+      {item.communityPic && (
+        <Image 
+          source={{ uri: `${item.communityPic}` }}
+          style={styles.postImage}
+          resizeMode="cover"
+        />
+      )}
 
       <View style={styles.tagsContainer}>
         {Array.isArray(item.labels) && item.labels.length > 0 ? (
@@ -375,66 +446,149 @@ const CommunityScreen = ({ navigation }) => {
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create New Post</Text>
             <TouchableOpacity
               onPress={handleModalClose}
               style={styles.modalCloseButton}>
-              <Icon name="close" size={24} color={semantic.text.primary} />
+              <Icon name="arrow-left" size={24} color={semantic.text.primary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create New Post</Text>
+            <TouchableOpacity
+              style={[
+                styles.modalPostButton,
+                (!newPost.heading_name || !newPost.description || !newPost.heading) && styles.modalPostButtonDisabled
+              ]}
+              disabled={!newPost.heading_name || !newPost.description || !newPost.heading || isLoading}
+              onPress={handleCreatePost}>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.modalPostButtonText}>Post</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Post Title"
-            value={newPost.heading_name}
-            onChangeText={(text) => setNewPost(prev => ({ ...prev, heading_name: text }))}
-          />
+          <ScrollView style={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>Category</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.categorySelectorScroll}>
+                <View style={styles.categorySelector}>
+                  {categories.slice(1).map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={[
+                        styles.categoryChip,
+                        newPost.heading === category.name && styles.activeCategoryChip,
+                      ]}
+                      onPress={() => setNewPost(prev => ({ ...prev, heading: category.name }))}>
+                      <Icon 
+                        name={category.icon} 
+                        size={20} 
+                        color={newPost.heading === category.name ? semantic.text.inverse : colors.primary.main} 
+                      />
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          newPost.heading === category.name && styles.activeCategoryChipText,
+                        ]}>
+                        {category.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
 
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Write your story..."
-            value={newPost.description}
-            onChangeText={(text) => setNewPost(prev => ({ ...prev, description: text }))}
-            multiline
-            numberOfLines={4}
-          />
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>Title</Text>
+              <TextInput
+                style={styles.titleInput}
+                placeholder="Write a title for your post..."
+                placeholderTextColor={semantic.text.secondary}
+                value={newPost.heading_name}
+                onChangeText={(text) => setNewPost(prev => ({ ...prev, heading_name: text }))}
+                maxLength={100}
+              />
+            </View>
 
-          <View style={styles.categorySelector}>
-            {categories.slice(1).map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryChip,
-                  newPost.heading === category.name && styles.activeCategoryChip,
-                ]}
-                onPress={() => setNewPost(prev => ({ ...prev, heading: category.name }))}>
-                <Icon 
-                  name={category.icon} 
-                  size={20} 
-                  color={newPost.heading === category.name ? semantic.text.inverse : colors.primary.main} 
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>Description</Text>
+              <TextInput
+                style={styles.descriptionInput}
+                placeholder="Share your story..."
+                placeholderTextColor={semantic.text.secondary}
+                value={newPost.description}
+                onChangeText={(text) => setNewPost(prev => ({ ...prev, description: text }))}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>Labels</Text>
+              <View style={styles.labelInputContainer}>
+                <TextInput
+                  style={styles.labelInput}
+                  placeholder="Add labels (e.g., motivation, career)"
+                  placeholderTextColor={semantic.text.secondary}
+                  value={labelInput}
+                  onChangeText={setLabelInput}
+                  onSubmitEditing={handleAddLabel}
+                  returnKeyType="done"
                 />
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    newPost.heading === category.name && styles.activeCategoryChipText,
-                  ]}>
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                <TouchableOpacity 
+                  style={styles.addLabelButton}
+                  onPress={handleAddLabel}>
+                  <Icon name="plus" size={20} color={colors.primary.main} />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.labelsContainer}>
+                {newPost.labels.map((label, index) => (
+                  <View key={index} style={styles.labelChip}>
+                    <Text style={styles.labelChipText}>#{label}</Text>
+                    <TouchableOpacity 
+                      onPress={() => handleRemoveLabel(index)}
+                      style={styles.removeLabelButton}>
+                      <Icon name="close" size={16} color={semantic.text.secondary} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
 
-          <TouchableOpacity
-            style={[
-              styles.createButton,
-              (!newPost.heading_name || !newPost.description || !newPost.heading) && styles.createButtonDisabled
-            ]}
-            disabled={!newPost.heading_name || !newPost.description || !newPost.heading || isLoading}
-            onPress={handleCreatePost}>
-            <Text style={styles.createButtonText}>
-              {isLoading ? 'Creating...' : 'Create Post'}
-            </Text>
-          </TouchableOpacity>
+            <View style={styles.modalSection}>
+              <View style={styles.mediaHeaderContainer}>
+                <Text style={styles.sectionLabel}>Media</Text>
+                <TouchableOpacity onPress={pickImage} style={styles.addMediaButton}>
+                  <Icon name="image-plus" size={20} color={colors.primary.main} />
+                  <Text style={styles.addMediaText}>Add Photo</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {newPost.communityPic ? (
+                <View style={styles.selectedImageContainer}>
+                  <Image 
+                    source={{ uri: newPost.communityPic.uri }}
+                    style={styles.selectedImage}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity 
+                    style={styles.removeImageButton}
+                    onPress={() => setNewPost(prev => ({ ...prev, communityPic: null }))}>
+                    <Icon name="close-circle" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={pickImage} style={styles.uploadPlaceholder}>
+                  <Icon name="image-plus" size={32} color={colors.primary.main} />
+                  <Text style={styles.uploadText}>Add Image</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </RNModal>
@@ -629,6 +783,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -680,60 +840,179 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    padding: 20,
   },
   modalContent: {
+    flex: 1,
     backgroundColor: semantic.background.paper,
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  input: {
-    backgroundColor: semantic.background.default,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: semantic.border.light,
-    color: semantic.text.primary,
-  },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  categorySelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
-  createButton: {
-    backgroundColor: colors.primary.main,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  createButtonDisabled: {
-    backgroundColor: semantic.background.disabled,
-  },
-  createButtonText: {
-    color: semantic.text.inverse,
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: 50,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: semantic.border.light,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: semantic.text.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   modalCloseButton: {
     padding: 8,
+  },
+  modalPostButton: {
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  modalPostButtonDisabled: {
+    backgroundColor: semantic.background.disabled,
+  },
+  modalPostButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalScrollContent: {
+    flex: 1,
+  },
+  modalSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: semantic.border.light,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: semantic.text.primary,
+    marginBottom: 12,
+  },
+  categorySelectorScroll: {
+    marginHorizontal: -16,
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  titleInput: {
+    fontSize: 18,
+    color: semantic.text.primary,
+    padding: 0,
+    marginTop: 4,
+  },
+  descriptionInput: {
+    fontSize: 16,
+    color: semantic.text.primary,
+    padding: 0,
+    marginTop: 4,
+    minHeight: 120,
+  },
+  mediaHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addMediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.primary.main}15`,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  addMediaText: {
+    color: colors.primary.main,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  uploadPlaceholder: {
+    height: 200,
+    backgroundColor: `${colors.primary.main}10`,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: `${colors.primary.main}30`,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadText: {
+    color: colors.primary.main,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  selectedImageContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  selectedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  labelInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  labelInput: {
+    flex: 1,
+    fontSize: 16,
+    color: semantic.text.primary,
+    padding: 12,
+    backgroundColor: semantic.background.default,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  addLabelButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${colors.primary.main}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  labelsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  labelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.primary.main}15`,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 16,
+  },
+  labelChipText: {
+    color: colors.primary.main,
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  removeLabelButton: {
+    padding: 2,
   },
 });
 

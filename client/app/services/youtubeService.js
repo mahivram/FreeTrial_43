@@ -151,23 +151,27 @@ export const fetchRecommendedChannelVideos = async (skill) => {
 const tutorialCache = new Map();
 const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
-export const getCachedTutorials = async (skill, level = 'beginner') => {
+export const getCachedTutorials = async (skill, forceRefresh = false, level = 'beginner') => {
   const cacheKey = `${skill}-${level}`;
   const cachedData = tutorialCache.get(cacheKey);
 
-  if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+  // Return cached data only if not forcing refresh and cache is still valid
+  if (!forceRefresh && cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
     console.log('Returning cached tutorials for:', skill, level);
     return cachedData.data;
   }
 
-  console.log('Fetching fresh tutorials for:', skill, level);
+  console.log(forceRefresh ? 'Force refreshing tutorials for:' : 'Fetching fresh tutorials for:', skill, level);
   const tutorials = await fetchTutorialsForSkill(skill, level);
   
   if (tutorials.length > 0) {
+    // Shuffle the tutorials before caching to ensure variety
+    const shuffledTutorials = [...tutorials].sort(() => Math.random() - 0.5);
     tutorialCache.set(cacheKey, {
-      data: tutorials,
+      data: shuffledTutorials,
       timestamp: Date.now(),
     });
+    return shuffledTutorials;
   }
 
   return tutorials;

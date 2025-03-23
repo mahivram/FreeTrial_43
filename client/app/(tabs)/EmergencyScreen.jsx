@@ -119,20 +119,6 @@ const EmergencyScreen = () => {
       color: '#EF4444',
       action: () => handleRecordAudio(),
     },
-    {
-      id: '3',
-      title: 'Emergency SMS',
-      icon: 'message-alert',
-      color: '#F59E0B',
-      action: () => handleEmergencySMS(),
-    },
-    {
-      id: '4',
-      title: 'Emergency Contacts',
-      icon: 'contacts',
-      color: '#10B981',
-      action: () => setExpandedSection('contacts'),
-    },
   ];
 
   const safetyTips = [
@@ -358,16 +344,7 @@ const handleShareLocation = async () => {
     );
   };
 
-  const handleEmergencySMS = () => {
-    Alert.alert(
-      'Emergency SMS',
-      'This will send an emergency SMS to your contacts',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Send', onPress: () => console.log('Send emergency SMS') },
-      ]
-    );
-  };
+  
 
   return (
     <ScrollView style={styles.container}>

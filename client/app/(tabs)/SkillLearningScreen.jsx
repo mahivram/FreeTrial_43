@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -91,6 +92,7 @@ const SkillLearningScreen = () => {
   const [tutorials, setTutorials] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (userSkills && userSkills.length > 0) {
@@ -98,7 +100,7 @@ const SkillLearningScreen = () => {
     }
   }, [userSkills]);
 
-  const loadTutorials = useCallback(async (skills) => {
+  const loadTutorials = useCallback(async (skills, forceRefresh = false) => {
     if (!skills || skills.length === 0) {
       setTutorials({});
       setError(null);
@@ -112,10 +114,11 @@ const SkillLearningScreen = () => {
     try {
       for (const skill of skills) {
         console.log('Loading tutorials for skill:', skill);
-        const skillTutorials = await getCachedTutorials(skill);
+        const skillTutorials = await getCachedTutorials(skill, forceRefresh);
         if (skillTutorials && skillTutorials.length > 0) {
-          tutorialsData[skill] = skillTutorials;
-          console.log(`Loaded ${skillTutorials.length} tutorials for ${skill}`);
+          const shuffledTutorials = [...skillTutorials].sort(() => Math.random() - 0.5);
+          tutorialsData[skill] = shuffledTutorials;
+          console.log(`Loaded ${shuffledTutorials.length} tutorials for ${skill}`);
         } else {
           console.log(`No tutorials found for ${skill}`);
         }
@@ -130,7 +133,7 @@ const SkillLearningScreen = () => {
   }, []); 
 
   useEffect(() => {
-    loadTutorials(currentSkills);
+    loadTutorials(currentSkills, false);
   }, [currentSkills, loadTutorials]);
 
   const handleVideoPress = useCallback((videoId) => {
@@ -230,13 +233,36 @@ const SkillLearningScreen = () => {
     );
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadTutorials(currentSkills, true);
+    } catch (error) {
+      console.error('Error refreshing tutorials:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [currentSkills, loadTutorials]);
+
   return (
     <View style={styles.container}>
       <StatusBar
         backgroundColor={semantic.background.paper}
         barStyle="dark-content"
       />
-      <ScrollView contentContainerStyle={styles.contentContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary.main]}
+            tintColor={colors.primary.main}
+            title="Pull to refresh..."
+            titleColor={semantic.text.secondary}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Learning</Text>
           <View style={styles.headerButtons}>

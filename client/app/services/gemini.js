@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI("AIzaSyBsgI9CTYtT5X5paRth3Xxczzj2f1XB4tQ");
+const genAI = new GoogleGenerativeAI("AIzaSyDRbyO7gcOE2VOf5kdL_zY_LsQJOgF9LE8");
 
 export const generateResponse = async (prompt) => {
     try {
