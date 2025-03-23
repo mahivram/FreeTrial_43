@@ -161,10 +161,72 @@ const EmergencyScreen = () => {
       .catch(err => console.error('An error occurred', err));
   };
 
-// Share Location
-const handleShareLocation = async () => {
-  
+// Create an axios instance with the base URL
+const api = axios.create({
+  baseURL: 'http://192.168.182.63:3002',  // Confirmed port 3002
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
 
+// Add request/response interceptors for better error handling
+api.interceptors.request.use(
+  config => {
+    console.log('🚀 Request:', {
+      url: config.url,
+      method: config.method,
+      data: config.data
+    });
+    return config;
+  },
+  error => {
+    console.error('❌ Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+api.interceptors.response.use(
+  response => {
+    console.log('✅ Response:', {
+      status: response.status,
+      url: response.config.url
+    });
+    return response;
+  },
+  error => {
+    if (error.code === 'ECONNABORTED') {
+      console.error('⏱️ Request timeout');
+    } else if (!error.response) {
+      console.error('🌐 Network error - server unreachable');
+    } else {
+      console.error('❌ Response Error:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        message: error.response?.data?.message || error.message
+      });
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Helper function to check server connectivity
+const checkServerConnectivity = async () => {
+  try {
+    // Try the root endpoint first
+    await api.get('/');
+    return true;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      // Server is reachable but endpoint doesn't exist
+      return true;
+    }
+    return false;
+  }
+};
+
+const handleShareLocation = async () => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -172,7 +234,16 @@ const handleShareLocation = async () => {
       return;
     }
 
-    const location = await Location.getCurrentPositionAsync({});
+    // Check server connectivity
+    const isServerReachable = await checkServerConnectivity();
+    if (!isServerReachable) {
+      throw new Error('Server is not reachable. Please try again later.');
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+      timeout: 15000
+    });
     const { latitude, longitude } = location.coords;
 
     // Get all emergency numbers to notify
@@ -182,12 +253,16 @@ const handleShareLocation = async () => {
     ];
 
     try {
-      // Send location  to all numbers
+      // Send location to all numbers using the api instance
       const promises = numbersToNotify.map(phoneNumber =>
-        axios.post("http://192.168.182.63:3000/send-location", {
+        api.post("/send-location", {  // Using original endpoint
           phoneNumber,
-          latitude,
-          longitude,
+          location: {
+            latitude,
+            longitude,
+            timestamp: new Date().toISOString(),
+            accuracy: location.coords.accuracy
+          }
         })
       );
 
@@ -222,12 +297,11 @@ const handleShareLocation = async () => {
         ]
       );
     }
-
   } catch (error) {
-    console.error('Location Error:', error);
+    console.error('Error:', error);
     Alert.alert(
       "❌ Error",
-      "Could not get your location. Please try calling emergency services directly.",
+      error.message || "Could not complete the operation. Please try again.",
       [
         {
           text: "Call Emergency",
@@ -242,96 +316,91 @@ const handleShareLocation = async () => {
         { text: "Cancel", style: "cancel" }
       ]
     );
-  } finally {
-    
   }
 };
 
- const sendSos = async () => {
-    setLoading(true);
+const sendSos = async () => {
+  setLoading(true);
+
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Denied", "Allow location access to send SOS.");
+      return;
+    }
+
+    // Check server health first
+    try {
+      await api.get('/health');
+    } catch (error) {
+      throw new Error('Server is not reachable. Please try again later.');
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+      timeout: 15000
+    });
+    const { latitude, longitude } = location.coords;
+
+    // Get all emergency numbers to notify
+    const numbersToNotify = [
+      ...parentContacts.map(contact => contact.number),
+      emergencyContacts[0].number // Police number as backup
+    ];
 
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Allow location access to send SOS.");
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      // Get all emergency numbers to notify
-      const numbersToNotify = [
-        ...parentContacts.map(contact => contact.number),
-        emergencyContacts[0].number // Police number as backup
-      ];
-
-      try {
-        // Send SOS Alert to all numbers
-        const promises = numbersToNotify.map(phoneNumber =>
-          axios.post("http://192.168.182.63:3000/send-sos", {
-            phoneNumber,
+      // Send SOS Alert to all numbers
+      const promises = numbersToNotify.map(phoneNumber =>
+        api.post("/emergency/sos", {  // Updated endpoint
+          phoneNumber,
+          location: {
             latitude,
             longitude,
-          })
-        );
+            timestamp: new Date().toISOString(),
+            accuracy: location.coords.accuracy
+          },
+          type: 'SOS'
+        })
+      );
 
-        await Promise.all(promises);
-        Alert.alert("✅ SOS Sent", "Emergency alerts sent to all emergency contacts");
+      await Promise.all(promises);
+      Alert.alert("✅ SOS Sent", "Emergency alerts sent to all emergency contacts");
 
-      } catch (networkError) {
-        console.error('Network Error:', networkError);
-        Alert.alert(
-          "Unable to Send SOS",
-          "Server is unreachable. Would you like to:",
-          [
-            {
-              text: "Call Emergency Contact",
-              onPress: () => {
-                if (parentContacts.length > 0) {
-                  handleCall(parentContacts[0].number);
-                } else {
-                  handleCall(emergencyContacts[0].number);
-                }
-              },
-              style: "default"
-            },
-            {
-              text: "Share Location",
-              onPress: () => {
-                const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                Linking.openURL(mapsUrl);
-              }
-            },
-            { text: "Cancel", style: "cancel" }
-          ]
-        );
-      }
+    } catch (networkError) {
+      throw networkError; // Let the outer catch handle it
+    }
 
-    } catch (error) {
-      console.error('Location Error:', error);
-      Alert.alert(
-        "❌ Error",
-        "Could not get your location. Please try calling emergency services directly.",
-        [
-          {
-            text: "Call Emergency",
-            onPress: () => {
-              if (parentContacts.length > 0) {
-                handleCall(parentContacts[0].number);
-              } else {
-                handleCall(emergencyContacts[0].number);
-              }
+  } catch (error) {
+    console.error('Error:', error);
+    Alert.alert(
+      "Unable to Send SOS",
+      error.message || "Server is unreachable. Please try alternative methods.",
+      [
+        {
+          text: "Call Emergency Contact",
+          onPress: () => {
+            if (parentContacts.length > 0) {
+              handleCall(parentContacts[0].number);
+            } else {
+              handleCall(emergencyContacts[0].number);
             }
           },
-          { text: "Cancel", style: "cancel" }
-        ]
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
+          style: "default"
+        },
+        {
+          text: "Share Location",
+          onPress: () => {
+            const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            Linking.openURL(mapsUrl);
+          }
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRecordAudio = () => {
     Alert.alert(

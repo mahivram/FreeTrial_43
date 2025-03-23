@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StatusBar,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -82,6 +83,14 @@ const skillCategories = [
   },
 ];
 
+const LANGUAGES = [
+  { id: 'hindi', name: 'Hindi', code: 'hi', icon: 'alpha-h-circle' },
+  { id: 'english', name: 'English', code: 'en', icon: 'alpha-e-circle' },
+  { id: 'marathi', name: 'Marathi', code: 'mr', icon: 'alpha-m-circle' },
+  { id: 'gujarati', name: 'Gujarati', code: 'gu', icon: 'alpha-g-circle' },
+  { id: 'tamil', name: 'Tamil', code: 'ta', icon: 'alpha-t-circle' },
+];
+
 const SkillLearningScreen = () => {
   const router = useRouter();
   const { userSkills, setUserSkills } = useAuth();
@@ -93,6 +102,8 @@ const SkillLearningScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   useEffect(() => {
     if (userSkills && userSkills.length > 0) {
@@ -114,7 +125,7 @@ const SkillLearningScreen = () => {
     try {
       for (const skill of skills) {
         console.log('Loading tutorials for skill:', skill);
-        const skillTutorials = await getCachedTutorials(skill, forceRefresh);
+        const skillTutorials = await getCachedTutorials(skill, forceRefresh, 'beginner', selectedLanguage.code);
         if (skillTutorials && skillTutorials.length > 0) {
           const shuffledTutorials = [...skillTutorials].sort(() => Math.random() - 0.5);
           tutorialsData[skill] = shuffledTutorials;
@@ -130,11 +141,11 @@ const SkillLearningScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, []); 
+  }, [selectedLanguage]); 
 
   useEffect(() => {
-    loadTutorials(currentSkills, false);
-  }, [currentSkills, loadTutorials]);
+    loadTutorials(currentSkills, true);
+  }, [selectedLanguage, currentSkills, loadTutorials]);
 
   const handleVideoPress = useCallback((videoId) => {
     setSelectedVideo(videoId);
@@ -170,6 +181,64 @@ const SkillLearningScreen = () => {
     );
     return category ? category.category : 'Other';
   };
+
+  const handleLanguageSelect = useCallback((language) => {
+    setSelectedLanguage(language);
+    setLanguageModalVisible(false);
+  }, []);
+
+  const renderLanguageModal = () => (
+    <Modal
+      visible={languageModalVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setLanguageModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.languageModalContent}>
+          <View style={styles.languageModalHeader}>
+            <Text style={styles.languageModalTitle}>Select Language</Text>
+            <TouchableOpacity 
+              onPress={() => setLanguageModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <MaterialCommunityIcons name="close" size={24} color={semantic.text.primary} />
+            </TouchableOpacity>
+          </View>
+          {LANGUAGES.map((language) => (
+            <TouchableOpacity
+              key={language.id}
+              style={[
+                styles.languageOption,
+                selectedLanguage.id === language.id && styles.selectedLanguageOption
+              ]}
+              onPress={() => handleLanguageSelect(language)}
+            >
+              <MaterialCommunityIcons 
+                name={language.icon} 
+                size={24} 
+                color={selectedLanguage.id === language.id ? colors.primary.main : semantic.text.secondary}
+              />
+              <Text style={[
+                styles.languageText,
+                selectedLanguage.id === language.id && styles.selectedLanguageText
+              ]}>
+                {language.name}
+              </Text>
+              {selectedLanguage.id === language.id && (
+                <MaterialCommunityIcons 
+                  name="check" 
+                  size={20} 
+                  color={colors.primary.main} 
+                  style={styles.checkIcon}
+                />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  );
 
   const renderSkillSection = ({ item: skill }) => {
     const skillTutorials = tutorials[skill] || [];
@@ -266,6 +335,17 @@ const SkillLearningScreen = () => {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Learning</Text>
           <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.languageButton}
+              onPress={() => setLanguageModalVisible(true)}>
+              <MaterialCommunityIcons 
+                name={selectedLanguage.icon} 
+                size={20} 
+                color={colors.primary.main}
+                style={styles.languageIcon} 
+              />
+              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.primary.main} />
+            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.editSkillsButton}
               onPress={() => setSkillsEditorVisible(true)}>
@@ -366,6 +446,8 @@ const SkillLearningScreen = () => {
         selectedSkills={currentSkills}
         onSkillsUpdate={handleSkillsUpdate}
       />
+
+      {renderLanguageModal()}
     </View>
   );
 };
@@ -393,6 +475,18 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary.light,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  languageIcon: {
+    marginRight: 4,
   },
   editSkillsButton: {
     flexDirection: 'row',
@@ -619,6 +713,57 @@ const styles = StyleSheet.create({
     color: semantic.text.inverse,
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageModalContent: {
+    backgroundColor: semantic.background.paper,
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+    ...shadows.lg,
+  },
+  languageModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  languageModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: semantic.text.primary,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  selectedLanguageOption: {
+    backgroundColor: colors.primary.light,
+  },
+  languageText: {
+    fontSize: 16,
+    color: semantic.text.primary,
+    marginLeft: 12,
+  },
+  selectedLanguageText: {
+    color: colors.primary.main,
+    fontWeight: '600',
+  },
+  checkIcon: {
+    marginLeft: 'auto',
   },
 });
 

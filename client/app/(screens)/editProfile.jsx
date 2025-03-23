@@ -77,7 +77,7 @@ const EditProfileScreen = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await axios.get('https://myapp.loca.lt/api/user/', {
+      const response = await axios.get('https://07ab-14-139-122-82.ngrok-free.app/api/user/', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -162,7 +162,7 @@ const EditProfileScreen = () => {
       }
 
       const response = await axios.put(
-        'https://myapp.loca.lt/api/user/update',
+        'https://07ab-14-139-122-82.ngrok-free.app/api/user/update',
         formDataToSend,
         {
           headers: {

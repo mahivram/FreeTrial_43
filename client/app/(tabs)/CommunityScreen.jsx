@@ -27,7 +27,7 @@ import {
   deletePost,
 } from '../services/community';
 
-const SOCKET_URL = "https://myapp.loca.lt";
+const SOCKET_URL = "https://07ab-14-139-122-82.ngrok-free.app/";
 const socket = io(SOCKET_URL);
 
 

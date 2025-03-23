@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL_Profile = 'https://myapp.loca.lt/api/user';
+const BASE_URL_Profile = 'https://07ab-14-139-122-82.ngrok-free.app/api/user';
 
 const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
   const router = useRouter();
@@ -70,7 +70,7 @@ const ProfileScreen = ({ toggleSaheliButton, showSaheliButton }) => {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await axios.get(`https://myapp.loca.lt/api/user/`, {
+      const response = await axios.get(`https://07ab-14-139-122-82.ngrok-free.app/`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

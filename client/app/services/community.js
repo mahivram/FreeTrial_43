@@ -1,7 +1,7 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "https://myapp.loca.lt/api/community";
+const BASE_URL = "https://07ab-14-139-122-82.ngrok-free.app/api/community";
 
 
 /**

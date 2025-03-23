@@ -3,7 +3,7 @@ import axios from "axios";
 // Login APIimport axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "https://myapp.loca.lt/api/user"; 
+const BASE_URL = "https://07ab-14-139-122-82.ngrok-free.app/api/user"; 
 
 // Registration Function
 // export const registerUser = async (name, email, password) => {

@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Create axios instance with default config
 
 const api = axios.create({
-  baseURL: 'https://myapp.loca.lt/api',
+  baseURL: 'https://07ab-14-139-122-82.ngrok-free.app/api',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

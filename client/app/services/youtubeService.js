@@ -49,30 +49,42 @@ const getMockTutorials = (skill) => {
   return mockData;
 };
 
-export const fetchTutorialsForSkill = async (skill, level = 'beginner') => {
+export const fetchTutorialsForSkill = async (skill, level = 'beginner', language = 'hi') => {
   try {
     // Get the search query for the skill and level
-    const searchQuery = getYouTubeSearchQuery(skill, level);
+    const searchQuery = getYouTubeSearchQuery(skill, level, language);
     if (!searchQuery) {
       console.error('No search query generated for:', skill, level);
       return getMockTutorials(skill);
     }
 
-    console.log('Searching for skill:', skill, 'level:', level);
-    console.log('Search query:', searchQuery);
+    // Get language name for query
+    const languageNames = {
+      'hi': 'in hindi',
+      'en': 'in english',
+      'mr': 'in marathi',
+      'gu': 'in gujarati',
+      'ta': 'in tamil'
+    };
+    
+    // Append language to search query
+    const queryWithLanguage = `${searchQuery} ${languageNames[language] || ''}`;
+    
+    console.log('Searching for skill:', skill, 'level:', level, 'language:', language);
+    console.log('Search query:', queryWithLanguage);
 
     // Make the API request
     const response = await youtubeAPI.get('/search', {
       params: {
         part: 'snippet',
-        q: searchQuery,
+        q: queryWithLanguage,
         type: 'video',
-        relevanceLanguage: 'hi',
+        relevanceLanguage: language,
         maxResults: 20,
         videoEmbeddable: true,
         videoDuration: 'long',
         order: 'relevance',
-        regionCode: 'IN',
+        regionCode: language === 'hi' ? 'IN' : 'US',
         safeSearch: 'moderate',
         videoCategoryId: 27,
         fields: 'items(id/videoId,snippet(title,description,thumbnails/high,channelTitle,publishedAt))',
@@ -151,18 +163,18 @@ export const fetchRecommendedChannelVideos = async (skill) => {
 const tutorialCache = new Map();
 const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
-export const getCachedTutorials = async (skill, forceRefresh = false, level = 'beginner') => {
-  const cacheKey = `${skill}-${level}`;
+export const getCachedTutorials = async (skill, forceRefresh = false, level = 'beginner', language = 'hi') => {
+  const cacheKey = `${skill}-${level}-${language}`;
   const cachedData = tutorialCache.get(cacheKey);
 
   // Return cached data only if not forcing refresh and cache is still valid
   if (!forceRefresh && cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-    console.log('Returning cached tutorials for:', skill, level);
+    console.log('Returning cached tutorials for:', skill, level, language);
     return cachedData.data;
   }
 
-  console.log(forceRefresh ? 'Force refreshing tutorials for:' : 'Fetching fresh tutorials for:', skill, level);
-  const tutorials = await fetchTutorialsForSkill(skill, level);
+  console.log(forceRefresh ? 'Force refreshing tutorials for:' : 'Fetching fresh tutorials for:', skill, level, language);
+  const tutorials = await fetchTutorialsForSkill(skill, level, language);
   
   if (tutorials.length > 0) {
     // Shuffle the tutorials before caching to ensure variety
